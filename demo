@@ -1,0 +1,71 @@
+Create two instances (publisher and subscriber) and enable PubSub API. 
+Install below packages on both the machines
+
+apt update -y
+apt install python3-pip -y
+apt install python3.11-venv -y
+python3 -m venv myenv
+source myenv/bin/activate
+pip install google-cloud-pubsub
+
+---
+publisher.py
+
+
+from google.cloud import pubsub_v1
+import time
+
+# Replace with your project ID and topic ID
+project_id = "techlanders-internal"
+topic_id = "demo-topic"
+
+# Initialize a Publisher client
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path(project_id, topic_id)
+
+for n in range(1, 10):
+    data_str = f"Message number {n}"
+    data = data_str.encode("utf-8")
+    print(data)
+
+    time.sleep(1)  # Sleep for 1 second between messages
+
+    # Publish the message
+    future = publisher.publish(topic_path, data)
+    print(future.result())
+
+print(f"Published messages to: {topic_path}")
+
+---
+
+subscriber.py
+
+from google.cloud import pubsub_v1
+
+# Replace with your project ID and subscription ID
+project_id = "techlanders-internal"
+subscription_id = "demo-topic-sub"
+#Number of seconds the subscriber should listen for messages
+timeout = 5.0
+
+# Initialize a Subscriber client
+subscriber = pubsub_v1.SubscriberClient()
+subscription_path = subscriber.subscription_path(project_id, subscription_id)
+
+def callback(message: pubsub_v1.subscriber.message.Message) -> None:
+    print(f"Received {message}")
+    message.ack()
+
+# Listen for messages on the subscription
+streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
+print(f"Listening for messages on {subscription_path}...\n")
+
+# Call close once done
+with subscriber:
+   try:
+       streaming_pull_future.result(timeout=timeout)
+   except TimeoutError:
+       streaming_pull_future.cancel()
+       streaming_pull_future.result()
+
+
